@@ -1,2 +1,4 @@
 .cache/
 .env
+web/node_modules/
+.DS_Store

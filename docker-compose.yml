@@ -1,36 +1,120 @@
-version: "3.7"
-x-default-variables: &default-variables
-  NEWSAPI_KEY: ${NEWSAPI_KEY}
-  POSTGRES_DB: ${POSTGRES_DB}
-  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-  POSTGRES_USER: ${POSTGRES_USER}
-  POSTGRES_PORT: ${POSTGRES_PORT}
+version: "3"
 services:
   api:
     build:
       context: ./api
       dockerfile: Dockerfile
-    environment: *default-variables
-    ports: 
-      - "80:8080"
+    command: bash -c "
+      wget -P /go/src/app/certs/ https://pki.google.com/GIAG2.crt &&
+      mkdir -p /etc/letsencrypt/live/newsapp.glennfmeyer.com &&
+      sudo openssl req -x509 
+                        -nodes 
+                        -days 365 
+                        -newkey rsa:2048 
+                        -keyout /etc/letsencrypt/live/newsapp.glennfmeyer.com/privkey.pem 
+                        -out /etc/letsencrypt/live/newsapp.glennfmeyer.com/fullchain.pem 
+                        -outform PEM -subj '/C=${COUNTRY}/ST=${STATE}/L=${CITY}/O=${ORG}/CN=${DOMAIN}' &&
+      app"
     depends_on:
       - db
+    environment:
+      CITY: ${CITY}
+      COUNTRY: ${COUNTRY}
+      DOMAIN: ${DOMAIN}
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+      ORG: ${ORG}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+      STATE: ${STATE}
+    image: glennmeyer/newsapp_api:latest
     links:
       - db
+    ports: 
+      - "443:443"
+    volumes:
+      - certs:/etc/letsencrypt
+      - vars:/var/lib/letsencrypt
+    # logging:
+    #   driver: awslogs
+    #   options: 
+    #     awslogs-group: newsapp
+    #     awslogs-region: us-east-2
+    #     awslogs-stream-prefix: api
   db:
-    environment: *default-variables
+    environment: 
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PORT: ${POSTGRES_PORT}
     image: "postgres:11.5"
     ports:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - ./db/pgdata:/pgdata
+    # logging:
+    #   driver: awslogs
+    #   options: 
+    #     awslogs-group: newsapp
+    #     awslogs-region: us-east-2
+    #     awslogs-stream-prefix: db
   fetch:
     build:
       context: ./fetch
       dockerfile: Dockerfile
     depends_on:
       - db
-    environment: *default-variables
+    environment: 
+      NEWSAPI_KEY: ${NEWSAPI_KEY}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PORT: ${POSTGRES_PORT}
+    image: glennmeyer/newsapp_fetch:latest
     links:
       - db
+    # logging:
+    #   driver: awslogs
+    #   options: 
+    #     awslogs-group: newsapp
+    #     awslogs-region: us-east-2
+    #     awslogs-stream-prefix: fetch
+  # web:
+  #   build:
+  #     context: ./web
+  #     dockerfile: Dockerfile
+  #   depends_on:
+  #     - api
+  #   image: glennmeyer/newsapp_web:latest
+  #   links:
+  #     - api
+  #   ports:
+  #     - "4200:4200"
+  #   volumes:
+  #     - ./web:/web
+    # logging:
+    #   driver: awslogs
+    #   options: 
+    #     awslogs-group: newsapp
+    #     awslogs-region: us-east-2
+    #     awslogs-stream-prefix: web
+#   certbot:
+#     command: certonly --non-interactive --standalone --dry-run --agree-tos -m $EMAIL_ADDRESS -d $DOMAIN
+#     environment: 
+#       EMAIL_ADDRESS: ${EMAIL_ADDRESS}
+#       DOMAIN: ${DOMAIN}
+#     image: certbot/certbot
+#     logging:
+#       driver: awslogs
+#       options: 
+#         awslogs-group: newsapp
+#         awslogs-region: us-east-2
+#         awslogs-stream-prefix: certbot
+#     volumes:
+#       - certs:/etc/letsencrypt
+#       - vars:/var/lib/letsencrypt
+volumes:
+  certs:
+  vars:
       

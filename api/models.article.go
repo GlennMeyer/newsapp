@@ -2,24 +2,33 @@ package main
 
 import (
 	"errors"
+	"fmt"
+	"strconv"
 )
 
 type article struct {
-  Id      		string
-  Title   		string `sql:",notnull"`
-  Content 		string `sql:",notnull"`
-	Description string `sql:",notnull"`
-	Author 			string `sql:",notnull"`
-	Url					string `sql:",notnull"`
-	UrlToImage	string `sql:",notnull"`
-	PublishedAt	string `sql:",notnull"`
+  Id      		string `json:"id"`
+  Title   		string `json:"title"`
+  Content 		string `json:"content"`
+	Description string `json:"description"`
+	Author 			string `json:"author"`
+	Url					string `json:"url"`
+	UrlToImage	string `json:"urlToImage"`
+	PublishedAt	string `json:"publishedAt"`
 }
 
-func getAllArticles() []article {
-  var articles []article
+func getAllArticles(options queryParams) []article {
+	var articles []article
+	limit, _ := strconv.Atoi(options.PageSize)
+	offset, _ := strconv.Atoi(options.PageNumber)
+	offset = (offset - 1) * limit
+
+	fmt.Println("Offset: ", offset)
+	fmt.Println("Limit: ", limit)
+
   db := pgConnect()
   defer db.Close()
-  err := db.Model(&articles).Select()
+  err := db.Model(&articles).Offset(offset).Limit(limit).Select()
   if err != nil {
     panic(err)
   }
